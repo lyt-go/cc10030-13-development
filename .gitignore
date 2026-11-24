@@ -95,6 +95,9 @@ desktop.ini
 *.pid
 *.seed
 
+# 本地运行/冒烟产生的数据仓库（测试统一使用临时目录）
+data/
+
 # BEGIN S11 LOCAL SNAPSHOT EXCLUSIONS
 **/.git/**
 **/.hg/**

@@ -77,5 +77,39 @@ npm run dev
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
 
+## 历史回补·行政区树增量对账
+
+历史回补工作台（`/geo_backfill`）在通用清单之外提供「行政区树补采增量对账」批量入口，
+后端实现位于 `app/services/geo_backfill.py`、`app/services/region_dim.py`，
+专用路由为 `app/routers/backfill.py`（前缀 `/api/backfill`），台账落
+`data/backfill_reconcile/*.jsonl`、勘正单落 `data/region_boundary/`。
+
+| 接口 | 作用 |
+| --- | --- |
+| `POST /api/backfill/regions` | 登记行政区树节点（市/县），叶子即最小可核实子区 |
+| `GET /api/backfill/region-tree/{root_code}` | 输出嵌套行政区树 |
+| `POST /api/backfill/regions/{code}/boundary-revisions` | 边界勘正单登记并立即生效，历史版本留痕 |
+| `POST /api/backfill/supplement-batches` | 批量选择多条补采记录一次提交，逐点射线法落点，跨县/争议挂起不摊派 |
+| `GET /api/backfill/supplement-records` | 按父区/子区/状态查询逐点清单 |
+| `GET /api/backfill/observations/{obs_key}` | 观测查重：回查已计入哪次确认、申请或待次批补单 |
+| `POST /api/backfill/regions/{code}/confirmations` | 子区按当前生效边界独立核验逐点清单 |
+| `POST /api/backfill/applications` | 父区打开差额申请，快照当时可结算的逐点范围 |
+| `POST /api/backfill/applications/{id}/issue` | 实际签发，支持两种口径（见下） |
+| `POST /api/backfill/carryovers/{id}/settle` | 待次批补单对应子区核验后结算，点回到已确认并进入下一批申请 |
+| `GET /api/backfill/regions/{parent}/summary` | 按子区分别给出待对账数据与差额 |
+
+对账口径（同一观测全局唯一，任何路径只结算一次，重送/重发均幂等）：
+
+- `confirmed_only`：只结算已确认子区的点，未确认点转「待次批」补单。
+  以市级已登记 100、甲县确认 1 点、乙县待审 1 点为例，签发为 **101 条**并保留乙县补单。
+- `merge_pending`：首次签发前把范围内未确认点并入另一个**已通过确认**的子区，
+  上例可签发为 **102 条且无补单**；并入目标必须是本申请已确认的子区。
+- 申请未签发期间，待审子区随勘正边界完成独立核验后再走 `confirmed_only`，
+  同样得到 102 条、无补单；勘正改判的点只在新归属子区记一次增量，不会两县重复计入。
+- 跨县/边界争议点始终挂起，不进申请范围、不生成差额；再次提交同一观测直接判重，
+  返回其已计入的确认单/申请/补单，不多记差额。
+- 待次批补单在子区核验后经 `settle` 结算（勘正边界会在结算时重新复核），
+  点回到已确认并可纳入次批申请；补单只允许结算一次，同一观测全程只产生一次增量。
+
 领域：数据工程
 子方向：数据分析与数据应用

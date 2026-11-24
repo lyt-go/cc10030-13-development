@@ -37,6 +37,8 @@
       <button class="btn ghost" data-testid="reset" type="button" @click="resetFilters">重置条件</button>
     </form>
 
+    <BackfillReconcilePanel v-if="meta.key === 'geo_backfill'" />
+
     <table class="data-table">
       <thead>
         <tr>
@@ -96,6 +98,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import BackfillReconcilePanel from '@/views/BackfillReconcilePanel.vue'
 import {
   createEntry,
   downloadEntries,
